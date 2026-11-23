@@ -4,7 +4,7 @@
   }
 
   const AUDIO_EXT = [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".webm"];
-  const STORAGE_KEY = "lfp_playlists_v6";
+  const STORAGE_KEY = "lfp_playlists_v7";
   const DB_NAME = "SpicetifyLocalFolderDB";
   const STORE_NAME = "dirHandles";
 
@@ -151,11 +151,9 @@
       align-items: center;
       gap: 6px;
       margin-left: 8px;
-      max-width: 420px;
-      overflow-x: auto;
-      scrollbar-width: none;
+      flex-shrink: 0;
+      z-index: 50;
     }
-    #lfp-inline-wrap::-webkit-scrollbar { display: none; }
     .lfp-btn-add {
       background: #1db954;
       color: #000;
@@ -612,21 +610,26 @@
     if (modalOpenForId) deletePlaylist(modalOpenForId);
   };
 
-  function findMarketplaceAnchor() {
-    const candidates = Array.from(document.querySelectorAll("a, button"));
-    const marketEl = candidates.find((el) => {
-      const txt = (el.textContent || el.getAttribute("aria-label") || "").trim().toLowerCase();
-      return txt.includes("marketplace");
-    });
-    if (marketEl && marketEl.parentElement && marketEl.parentElement.isConnected) {
-      return { parent: marketEl.parentElement, afterEl: marketEl };
+  function findMarketplaceElement() {
+    const candidates = Array.from(document.querySelectorAll("a, button, [role='link'], [role='button']"));
+    for (const el of candidates) {
+      if (!el.isConnected) continue;
+      const href = (el.getAttribute("href") || "").toLowerCase();
+      const aria = (el.getAttribute("aria-label") || "").toLowerCase();
+      const title = (el.getAttribute("title") || "").toLowerCase();
+      const txt = (el.textContent || "").trim().toLowerCase();
+      const testId = (el.getAttribute("data-testid") || "").toLowerCase();
+
+      if (
+        href.includes("marketplace") ||
+        aria.includes("marketplace") ||
+        title.includes("marketplace") ||
+        testId.includes("marketplace") ||
+        txt === "marketplace"
+      ) {
+        return el;
+      }
     }
-
-    const topBar =
-      document.querySelector(".main-topBar-topbarContent") ||
-      document.querySelector(".main-topBar-header");
-    if (topBar && topBar.isConnected) return { parent: topBar, afterEl: null };
-
     return null;
   }
 
@@ -651,19 +654,15 @@
   }
 
   function ensureInlineButton() {
-    const anchor = findMarketplaceAnchor();
-    if (!anchor) return;
+    const marketEl = findMarketplaceElement();
+    if (!marketEl || !marketEl.parentElement) return;
 
     if (!wrapEl) {
       wrapEl = buildWrapElement();
     }
 
-    if (!wrapEl.isConnected) {
-      if (anchor.afterEl && anchor.afterEl.nextSibling) {
-        anchor.parent.insertBefore(wrapEl, anchor.afterEl.nextSibling);
-      } else {
-        anchor.parent.appendChild(wrapEl);
-      }
+    if (marketEl.nextElementSibling !== wrapEl) {
+      marketEl.insertAdjacentElement("afterend", wrapEl);
       renderChips();
     }
   }
@@ -685,5 +684,5 @@
 
   await loadSavedPlaylists();
   ensureInlineButton();
-  setInterval(ensureInlineButton, 2500);
+  setInterval(ensureInlineButton, 2000);
 })();
