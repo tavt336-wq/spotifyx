@@ -288,7 +288,6 @@
     return false;
   }
 
-  // Refresh ONLY the folder belonging to the selected playlist
   async function refreshSinglePlaylistFolder(playlistId) {
     const pl = getPlaylist(playlistId);
     if (!pl) return;
