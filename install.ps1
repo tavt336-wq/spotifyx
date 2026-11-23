@@ -7,7 +7,7 @@ Write-Host "=== Installing Spicetify Local Folder Playlist ===" -ForegroundColor
 
 function Get-SpicetifyExe {
     $cmd = Get-Command spicetify -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
+    if ($cmd -and (Test-Path $cmd.Source)) { return $cmd.Source }
 
     $candidates = @(
         (Join-Path $env:LOCALAPPDATA "spicetify\spicetify.exe"),
@@ -23,18 +23,20 @@ $spicetifyExe = Get-SpicetifyExe
 
 if (-not $spicetifyExe) {
     Write-Host "Spicetify not found. Installing Spicetify CLI..." -ForegroundColor Yellow
-    $spicetifyInstaller = Invoke-RestMethod -Uri "https://raw.githubusercontent.com/spicetify/cli/main/install.ps1" -UseBasicParsing
-    if ([string]::IsNullOrWhiteSpace($spicetifyInstaller)) {
-        throw "Could not download Spicetify installer."
+    $workDir = Join-Path $env:TEMP "SpotifyLocalFolderSetup"
+    if (-not (Test-Path $workDir)) {
+        New-Item -ItemType Directory -Path $workDir -Force | Out-Null
     }
-    Invoke-Expression $spicetifyInstaller
+    $officialInstaller = Join-Path $workDir "spicetify-install.ps1"
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/spicetify/cli/main/install.ps1" -OutFile $officialInstaller -UseBasicParsing
+    & $officialInstaller
 
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
     $spicetifyExe = Get-SpicetifyExe
 }
 
 if (-not $spicetifyExe) {
-    throw "Spicetify executable not found after installation. Please restart PowerShell and run again."
+    throw "Spicetify executable not found after installation. Open a new PowerShell window and run again."
 }
 
 $userDataPath = (& $spicetifyExe path userdata 2>$null | Out-String).Trim()
@@ -48,14 +50,7 @@ if (-not (Test-Path $extDir)) {
 }
 
 $addonTarget = Join-Path $extDir "localFolderPlaylist.js"
-$localSource = if ($PSScriptRoot) { Join-Path $PSScriptRoot "localFolderPlaylist.js" } else { "" }
-
-if ($localSource -and (Test-Path $localSource)) {
-    Copy-Item -Path $localSource -Destination $addonTarget -Force
-} else {
-    Invoke-WebRequest -Uri $AddonUrl -OutFile $addonTarget -UseBasicParsing
-}
-
+Invoke-WebRequest -Uri $AddonUrl -OutFile $addonTarget -UseBasicParsing
 Write-Host "Extension installed to: $addonTarget" -ForegroundColor Cyan
 
 & $spicetifyExe config extensions localFolderPlaylist.js
@@ -71,16 +66,20 @@ $watcherScript = @'
 $ErrorActionPreference = "SilentlyContinue"
 $wasRunning = $false
 
+function Resolve-Spicetify {
+    $cmd = Get-Command spicetify -ErrorAction SilentlyContinue
+    if ($cmd -and (Test-Path $cmd.Source)) { return $cmd.Source }
+    $p1 = Join-Path $env:LOCALAPPDATA "spicetify\spicetify.exe"
+    if (Test-Path $p1) { return $p1 }
+    return $null
+}
+
 while ($true) {
     $spotifyProc = Get-Process -Name "Spotify" -ErrorAction SilentlyContinue
     if ($spotifyProc -and -not $wasRunning) {
         $wasRunning = $true
-        $spExe = Join-Path $env:LOCALAPPDATA "spicetify\spicetify.exe"
-        if (-not (Test-Path $spExe)) {
-            $cmd = Get-Command spicetify -ErrorAction SilentlyContinue
-            if ($cmd) { $spExe = $cmd.Source }
-        }
-        if ($spExe -and (Test-Path $spExe)) {
+        $spExe = Resolve-Spicetify
+        if ($spExe) {
             $uData = (& $spExe path userdata 2>$null | Out-String).Trim()
             if ([string]::IsNullOrWhiteSpace($uData)) {
                 $uData = Join-Path $env:LOCALAPPDATA "spicetify"
@@ -105,4 +104,4 @@ Set-ItemProperty -Path $runKey -Name "SpotifyLocalFolderAddon" -Value $startupCm
 
 Start-Process -FilePath "powershell.exe" -ArgumentList "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$watcherPath`"" -WindowStyle Hidden
 
-Write-Host "Done! Auto-start enabled when Spotify opens." -ForegroundColor Green
+Write-Host "Done! Spicetify extension installed and auto-start enabled." -ForegroundColor Green
