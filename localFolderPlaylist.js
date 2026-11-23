@@ -1,10 +1,10 @@
 (async function localFolderPlaylist() {
   while (!Spicetify?.Player || !document.body) {
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 250));
   }
 
   const AUDIO_EXT = [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".webm"];
-  const STORAGE_KEY = "lfp_playlists_v5";
+  const STORAGE_KEY = "lfp_playlists_v6";
   const DB_NAME = "SpicetifyLocalFolderDB";
   const STORE_NAME = "dirHandles";
 
@@ -618,25 +618,21 @@
       const txt = (el.textContent || el.getAttribute("aria-label") || "").trim().toLowerCase();
       return txt.includes("marketplace");
     });
-    if (marketEl && marketEl.parentElement) {
+    if (marketEl && marketEl.parentElement && marketEl.parentElement.isConnected) {
       return { parent: marketEl.parentElement, afterEl: marketEl };
     }
 
     const topBar =
-      document.querySelector(".main-globalNav-navLink")?.parentElement ||
-      document.querySelector(".main-topBar-container .main-topBar-topbarContent") ||
-      document.querySelector(".main-topBar-header") ||
-      document.querySelector("header");
-    if (topBar) return { parent: topBar, afterEl: null };
+      document.querySelector(".main-topBar-topbarContent") ||
+      document.querySelector(".main-topBar-header");
+    if (topBar && topBar.isConnected) return { parent: topBar, afterEl: null };
 
-    return { parent: document.body, afterEl: null };
+    return null;
   }
 
-  function ensureInlineButton() {
-    if (document.getElementById("lfp-inline-wrap")) return;
-    const anchor = findMarketplaceAnchor();
-    if (!anchor) return;
+  let wrapEl = null;
 
+  function buildWrapElement() {
     const wrap = document.createElement("div");
     wrap.id = "lfp-inline-wrap";
 
@@ -651,13 +647,25 @@
 
     wrap.appendChild(addBtn);
     wrap.appendChild(chipsBox);
+    return wrap;
+  }
 
-    if (anchor.afterEl && anchor.afterEl.nextSibling) {
-      anchor.parent.insertBefore(wrap, anchor.afterEl.nextSibling);
-    } else {
-      anchor.parent.appendChild(wrap);
+  function ensureInlineButton() {
+    const anchor = findMarketplaceAnchor();
+    if (!anchor) return;
+
+    if (!wrapEl) {
+      wrapEl = buildWrapElement();
     }
-    renderChips();
+
+    if (!wrapEl.isConnected) {
+      if (anchor.afterEl && anchor.afterEl.nextSibling) {
+        anchor.parent.insertBefore(wrapEl, anchor.afterEl.nextSibling);
+      } else {
+        anchor.parent.appendChild(wrapEl);
+      }
+      renderChips();
+    }
   }
 
   function renderChips() {
@@ -677,5 +685,5 @@
 
   await loadSavedPlaylists();
   ensureInlineButton();
-  setInterval(ensureInlineButton, 1500);
+  setInterval(ensureInlineButton, 2500);
 })();
