@@ -4,7 +4,7 @@
   }
 
   const AUDIO_EXT = [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".webm"];
-  const STORAGE_KEY = "lfp_playlists_v3";
+  const STORAGE_KEY = "lfp_playlists_v4";
   const DB_NAME = "SpicetifyLocalFolderDB";
   const STORE_NAME = "dirHandles";
 
@@ -136,71 +136,142 @@
   const styleEl = document.createElement("style");
   styleEl.id = "lfp-styles";
   styleEl.textContent = `
-    #lfp-bar {
-      display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
-      padding: 8px 14px; background: rgba(18, 18, 18, 0.94);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08); z-index: 99;
+    #lfp-inline-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 8px;
+      max-width: 420px;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
+    #lfp-inline-wrap::-webkit-scrollbar { display: none; }
     .lfp-btn-add {
-      background: #1db954; color: #000; border: none; border-radius: 999px;
-      padding: 6px 12px; font-size: 12px; font-weight: 700; cursor: pointer;
+      background: #1db954;
+      color: #000;
+      border: none;
+      border-radius: 999px;
+      padding: 5px 11px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     .lfp-btn-add:hover { background: #1ed760; }
     .lfp-chip {
-      background: #282828; color: #fff; border: 1px solid #404040;
-      border-radius: 999px; padding: 5px 11px; font-size: 12px; cursor: pointer;
+      background: #282828;
+      color: #fff;
+      border: 1px solid #404040;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     .lfp-chip:hover { background: #333; }
     .lfp-chip.active {
-      background: #1db954; color: #000; border-color: #1db954; font-weight: 700;
+      background: #1db954;
+      color: #000;
+      border-color: #1db954;
+      font-weight: 700;
     }
     #lfp-modal-backdrop, #lfp-prompt-backdrop {
-      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75);
-      display: none; align-items: center; justify-content: center; z-index: 99999;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
       font-family: var(--font-family, system-ui, sans-serif);
     }
     #lfp-modal-backdrop.open, #lfp-prompt-backdrop.open { display: flex; }
     #lfp-modal {
-      width: 560px; max-width: 92vw; max-height: 80vh; background: #1e1e1e;
-      color: #fff; border: 1px solid #383838; border-radius: 12px;
-      display: flex; flex-direction: column; overflow: hidden;
+      width: 540px;
+      max-width: 90vw;
+      max-height: 76vh;
+      background: #1e1e1e;
+      color: #fff;
+      border: 1px solid #383838;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
     #lfp-modal-header {
-      padding: 16px 20px; background: #262626; border-bottom: 1px solid #363636;
-      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      padding: 14px 18px;
+      background: #262626;
+      border-bottom: 1px solid #363636;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
     }
     #lfp-controls {
-      display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 20px;
-      border-bottom: 1px solid #2e2e2e; background: #181818;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 18px;
+      border-bottom: 1px solid #2e2e2e;
+      background: #181818;
     }
     .lfp-ctrl-btn {
-      background: #2b2b2b; color: #fff; border: 1px solid #444;
-      border-radius: 999px; padding: 6px 12px; font-size: 12px; cursor: pointer;
+      background: #2b2b2b;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 999px;
+      padding: 5px 11px;
+      font-size: 12px;
+      cursor: pointer;
     }
     .lfp-ctrl-btn:hover { background: #383838; }
     .lfp-ctrl-btn.on {
-      background: rgba(29, 185, 84, 0.18); border-color: #1db954;
-      color: #1db954; font-weight: 700;
+      background: rgba(29, 185, 84, 0.18);
+      border-color: #1db954;
+      color: #1db954;
+      font-weight: 700;
     }
     .lfp-ctrl-btn.danger {
-      border-color: #b83b3b; color: #ff7b7b; margin-left: auto;
+      border-color: #b83b3b;
+      color: #ff7b7b;
+      margin-left: auto;
     }
     #lfp-tracks { flex: 1; overflow-y: auto; padding: 10px 14px; }
     .lfp-track {
-      padding: 8px 12px; border-radius: 6px; display: flex;
-      justify-content: space-between; align-items: center; cursor: pointer; font-size: 13px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      font-size: 13px;
     }
     .lfp-track:hover { background: #2a2a2a; }
     .lfp-track.playing {
-      color: #1db954; background: rgba(29, 185, 84, 0.12); font-weight: 700;
+      color: #1db954;
+      background: rgba(29, 185, 84, 0.12);
+      font-weight: 700;
     }
     #lfp-prompt {
-      width: 350px; background: #282828; color: #fff; padding: 20px;
-      border-radius: 10px; border: 1px solid #444;
+      width: 340px;
+      max-width: 90vw;
+      background: #282828;
+      color: #fff;
+      padding: 18px;
+      border-radius: 10px;
+      border: 1px solid #444;
     }
     #lfp-prompt input {
-      width: 100%; padding: 9px 11px; margin: 10px 0 14px 0; border-radius: 6px;
-      border: 1px solid #555; background: #121212; color: #fff; box-sizing: border-box;
+      width: 100%;
+      padding: 8px 10px;
+      margin: 10px 0 14px 0;
+      border-radius: 6px;
+      border: 1px solid #555;
+      background: #121212;
+      color: #fff;
+      box-sizing: border-box;
     }
   `;
   document.head.appendChild(styleEl);
@@ -209,7 +280,7 @@
   promptBackdrop.id = "lfp-prompt-backdrop";
   promptBackdrop.innerHTML = `
     <div id="lfp-prompt">
-      <h3 style="margin:0;">Name your playlist</h3>
+      <h3 style="margin:0; font-size:16px;">Name your playlist</h3>
       <p id="lfp-prompt-info" style="margin:6px 0 0 0; font-size:12px; color:#b3b3b3;"></p>
       <input id="lfp-prompt-input" type="text" placeholder="Playlist name..." />
       <div style="display:flex; justify-content:flex-end; gap:8px;">
@@ -226,7 +297,7 @@
     <div id="lfp-modal">
       <div id="lfp-modal-header">
         <div>
-          <h2 id="lfp-modal-title" style="margin:0; font-size:18px;">Playlist</h2>
+          <h2 id="lfp-modal-title" style="margin:0; font-size:17px;">Playlist</h2>
           <p id="lfp-modal-sub" style="margin:2px 0 0 0; font-size:12px; color:#b3b3b3;">0 tracks</p>
         </div>
         <button id="lfp-modal-close" class="lfp-ctrl-btn">✕ Close</button>
@@ -335,7 +406,7 @@
       modalBackdrop.querySelector("#lfp-modal-sub").textContent = `${freshTracks.length} tracks (saved)`;
       renderModalTracks(pl);
     }
-    renderBar();
+    renderChips();
     Spicetify.showNotification(`Refreshed "${pl.name}": ${freshTracks.length} tracks${diffText}`);
   }
 
@@ -394,7 +465,7 @@
     }
     if (modalOpenForId === playlistId) closePlaylistModal();
 
-    renderBar();
+    renderChips();
     Spicetify.showNotification(`Deleted playlist "${removed.name}".`);
   }
 
@@ -442,7 +513,7 @@
 
     renderModalTracks(pl);
     modalBackdrop.classList.add("open");
-    renderBar();
+    renderChips();
   }
 
   function closePlaylistModal() {
@@ -463,7 +534,7 @@
     activePlaylistId = id;
     if (dirHandle) await saveHandle(id, dirHandle);
     persistMetadata();
-    renderBar();
+    renderChips();
     await openPlaylistModal(id);
     Spicetify.showNotification(`Created playlist "${name}" (${tracks.length} tracks).`);
   }
@@ -531,15 +602,33 @@
     if (modalOpenForId) deletePlaylist(modalOpenForId);
   };
 
-  function ensureBar() {
-    if (document.getElementById("lfp-bar")) return;
-    const anchor =
-      document.querySelector(".Root__main-view") ||
-      document.querySelector(".main-view-container") ||
-      document.body;
+  // Găsește butonul Marketplace și inserează butonul "+ Music Folder" chiar lângă el
+  function findMarketplaceAnchor() {
+    const candidates = Array.from(document.querySelectorAll("a, button"));
+    const marketEl = candidates.find((el) => {
+      const txt = (el.textContent || el.getAttribute("aria-label") || "").trim().toLowerCase();
+      return txt === "marketplace";
+    });
+    if (marketEl && marketEl.parentElement) {
+      return { parent: marketEl.parentElement, afterEl: marketEl };
+    }
 
-    const bar = document.createElement("div");
-    bar.id = "lfp-bar";
+    const topBar =
+      document.querySelector(".main-topBar-container .main-topBar-topbarContent") ||
+      document.querySelector(".main-topBar-header") ||
+      document.querySelector("header");
+    if (topBar) return { parent: topBar, afterEl: null };
+
+    return null;
+  }
+
+  function ensureInlineButton() {
+    if (document.getElementById("lfp-inline-wrap")) return;
+    const anchor = findMarketplaceAnchor();
+    if (!anchor) return;
+
+    const wrap = document.createElement("div");
+    wrap.id = "lfp-inline-wrap";
 
     const addBtn = document.createElement("button");
     addBtn.className = "lfp-btn-add";
@@ -547,17 +636,22 @@
     addBtn.onclick = triggerFolderPick;
 
     const chipsBox = document.createElement("div");
-    chipsBox.id = "lfp-chips";
-    chipsBox.style.cssText = "display:flex; flex-wrap:wrap; gap:6px;";
+    chipsBox.id = "lfp-inline-chips";
+    chipsBox.style.cssText = "display:inline-flex; align-items:center; gap:5px;";
 
-    bar.appendChild(addBtn);
-    bar.appendChild(chipsBox);
-    anchor.prepend(bar);
-    renderBar();
+    wrap.appendChild(addBtn);
+    wrap.appendChild(chipsBox);
+
+    if (anchor.afterEl && anchor.afterEl.nextSibling) {
+      anchor.parent.insertBefore(wrap, anchor.afterEl.nextSibling);
+    } else {
+      anchor.parent.appendChild(wrap);
+    }
+    renderChips();
   }
 
-  function renderBar() {
-    const chipsBox = document.getElementById("lfp-chips");
+  function renderChips() {
+    const chipsBox = document.getElementById("lfp-inline-chips");
     if (!chipsBox) return;
     chipsBox.innerHTML = "";
 
@@ -572,7 +666,7 @@
   }
 
   await loadSavedPlaylists();
-  ensureBar();
-  const observer = new MutationObserver(() => ensureBar());
+  ensureInlineButton();
+  const observer = new MutationObserver(() => ensureInlineButton());
   observer.observe(document.body, { childList: true, subtree: true });
 })();
