@@ -4,7 +4,7 @@
   }
 
   const AUDIO_EXT = [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".webm"];
-  const STORAGE_KEY = "lfp_playlists_v4";
+  const STORAGE_KEY = "lfp_playlists_v5";
   const DB_NAME = "SpicetifyLocalFolderDB";
   const STORE_NAME = "dirHandles";
 
@@ -18,14 +18,18 @@
 
   function openDB() {
     return new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = () => {
-        if (!req.result.objectStoreNames.contains(STORE_NAME)) {
-          req.result.createObjectStore(STORE_NAME);
-        }
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
+      try {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          if (!req.result.objectStoreNames.contains(STORE_NAME)) {
+            req.result.createObjectStore(STORE_NAME);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 
@@ -62,10 +66,14 @@
 
   async function ensurePermission(handle) {
     if (!handle || typeof handle.queryPermission !== "function") return false;
-    const q = await handle.queryPermission({ mode: "read" });
-    if (q === "granted") return true;
-    const r = await handle.requestPermission({ mode: "read" });
-    return r === "granted";
+    try {
+      const q = await handle.queryPermission({ mode: "read" });
+      if (q === "granted") return true;
+      const r = await handle.requestPermission({ mode: "read" });
+      return r === "granted";
+    } catch (_) {
+      return false;
+    }
   }
 
   async function collectAudioFromDirHandle(dirHandle) {
@@ -92,12 +100,14 @@
   }
 
   function persistMetadata() {
-    const clean = playlists.map((p) => ({
-      id: p.id,
-      name: p.name,
-      trackNames: p.trackNames || p.tracks.map((t) => t.title)
-    }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+    try {
+      const clean = playlists.map((p) => ({
+        id: p.id,
+        name: p.name,
+        trackNames: p.trackNames || p.tracks.map((t) => t.title)
+      }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+    } catch (_) {}
   }
 
   async function loadSavedPlaylists() {
@@ -602,24 +612,24 @@
     if (modalOpenForId) deletePlaylist(modalOpenForId);
   };
 
-  // Găsește butonul Marketplace și inserează butonul "+ Music Folder" chiar lângă el
   function findMarketplaceAnchor() {
     const candidates = Array.from(document.querySelectorAll("a, button"));
     const marketEl = candidates.find((el) => {
       const txt = (el.textContent || el.getAttribute("aria-label") || "").trim().toLowerCase();
-      return txt === "marketplace";
+      return txt.includes("marketplace");
     });
     if (marketEl && marketEl.parentElement) {
       return { parent: marketEl.parentElement, afterEl: marketEl };
     }
 
     const topBar =
+      document.querySelector(".main-globalNav-navLink")?.parentElement ||
       document.querySelector(".main-topBar-container .main-topBar-topbarContent") ||
       document.querySelector(".main-topBar-header") ||
       document.querySelector("header");
     if (topBar) return { parent: topBar, afterEl: null };
 
-    return null;
+    return { parent: document.body, afterEl: null };
   }
 
   function ensureInlineButton() {
@@ -667,6 +677,5 @@
 
   await loadSavedPlaylists();
   ensureInlineButton();
-  const observer = new MutationObserver(() => ensureInlineButton());
-  observer.observe(document.body, { childList: true, subtree: true });
+  setInterval(ensureInlineButton, 1500);
 })();
