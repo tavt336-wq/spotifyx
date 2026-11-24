@@ -4,7 +4,7 @@
   }
 
   const AUDIO_EXT = [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".webm"];
-  const STORAGE_KEY = "lfp_playlists_v7";
+  const STORAGE_KEY = "lfp_playlists_v9";
   const DB_NAME = "SpicetifyLocalFolderDB";
   const STORE_NAME = "dirHandles";
 
@@ -15,6 +15,75 @@
 
   const audio = new Audio();
   audio.addEventListener("ended", () => playNext());
+
+  function playCurrentOrSelected() {
+    const targetId = modalOpenForId || playingState.playlistId || activePlaylistId;
+    const pl = getPlaylist(targetId);
+    if (!pl || !pl.tracks?.length) return;
+
+    try { Spicetify.Player.pause(); } catch (_) {}
+
+    if (audio.src && playingState.playlistId === targetId && playingState.trackIndex >= 0 && audio.paused) {
+      audio.play().catch(() => {});
+      const track = pl.tracks[playingState.trackIndex];
+      if (track) Spicetify.showNotification(`▶ [${pl.name}] ${track.title}`);
+      return;
+    }
+
+    const idx = playingState.playlistId === targetId && playingState.trackIndex >= 0 ? playingState.trackIndex : 0;
+    playTrack(pl.id, idx);
+  }
+
+  function pauseLocalAudio() {
+    if (!audio.paused) {
+      audio.pause();
+      const pl = getPlaylist(playingState.playlistId || activePlaylistId);
+      const track = pl?.tracks?.[playingState.trackIndex];
+      Spicetify.showNotification(track ? `⏸ [${pl.name}] ${track.title}` : "⏸ Paused");
+    }
+  }
+
+  function toggleLocalPlayPause() {
+    if (!audio.src) {
+      playCurrentOrSelected();
+      return;
+    }
+
+    if (audio.paused) {
+      playCurrentOrSelected();
+    } else {
+      pauseLocalAudio();
+    }
+  }
+
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (e.code !== "Space" && e.key !== " ") return;
+      if (e.repeat) return;
+
+      const active = document.activeElement;
+      const isTyping =
+        active &&
+        (active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.isContentEditable);
+
+      if (isTyping) return;
+
+      const hasLocalTrack =
+        Boolean(audio.src) ||
+        Boolean(getPlaylist(playingState.playlistId || activePlaylistId)?.tracks?.length);
+      if (!hasLocalTrack) return;
+
+      if (audio.src || modalOpenForId) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleLocalPlayPause();
+      }
+    },
+    true
+  );
 
   function openDB() {
     return new Promise((resolve, reject) => {
@@ -197,7 +266,7 @@
     }
     #lfp-modal-backdrop.open, #lfp-prompt-backdrop.open { display: flex; }
     #lfp-modal {
-      width: 540px;
+      width: 560px;
       max-width: 90vw;
       max-height: 76vh;
       background: #1e1e1e;
@@ -311,6 +380,8 @@
         <button id="lfp-modal-close" class="lfp-ctrl-btn">✕ Close</button>
       </div>
       <div id="lfp-controls">
+        <button id="lfp-play-btn" class="lfp-ctrl-btn">▶ Play</button>
+        <button id="lfp-pause-btn" class="lfp-ctrl-btn">⏸ Pause</button>
         <button id="lfp-prev-btn" class="lfp-ctrl-btn">⏮ Prev</button>
         <button id="lfp-next-btn" class="lfp-ctrl-btn">Next ⏭</button>
         <button id="lfp-shuffle-btn" class="lfp-ctrl-btn">🔀 Shuffle: OFF</button>
@@ -430,7 +501,7 @@
 
     const track = pl.tracks[safeIdx];
     audio.src = track.url;
-    audio.play();
+    audio.play().catch(() => {});
     Spicetify.showNotification(`[${pl.name}] ${track.title}`);
 
     if (modalOpenForId === playlistId) renderModalTracks(pl);
@@ -595,6 +666,8 @@
   modalBackdrop.addEventListener("click", (e) => {
     if (e.target === modalBackdrop) closePlaylistModal();
   });
+  modalBackdrop.querySelector("#lfp-play-btn").onclick = playCurrentOrSelected;
+  modalBackdrop.querySelector("#lfp-pause-btn").onclick = pauseLocalAudio;
   modalBackdrop.querySelector("#lfp-prev-btn").onclick = playPrev;
   modalBackdrop.querySelector("#lfp-next-btn").onclick = playNext;
   modalBackdrop.querySelector("#lfp-shuffle-btn").onclick = () => {
