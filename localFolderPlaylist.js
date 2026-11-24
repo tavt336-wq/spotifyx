@@ -4,7 +4,7 @@
   }
 
   const AUDIO_EXT = [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".webm"];
-  const STORAGE_KEY = "lfp_playlists_v15";
+  const STORAGE_KEY = "lfp_playlists_v17";
   const VOL_STORAGE_KEY = "lfp_volume_v1";
   const DB_NAME = "SpicetifyLocalFolderDB";
   const STORE_NAME = "dirHandles";
@@ -96,7 +96,7 @@
     }
   }
 
-  function toggleMenuSpace() {
+  function toggleMenuPlayPause() {
     if (!modalOpenForId) return;
     pauseSpotify();
     if (!audio.src || audio.paused) {
@@ -104,7 +104,6 @@
     } else {
       pauseLocalAudio();
     }
-    // Keep Spotify from resuming on Space
     setTimeout(pauseSpotify, 40);
   }
 
@@ -113,13 +112,11 @@
     const active = document.activeElement;
     if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) return;
 
-    const isSpace = e.code === "Space" || e.key === " " || e.key === "Spacebar" || e.keyCode === 32;
-    if (isSpace) {
-      if (active && typeof active.blur === "function" && active !== document.body) active.blur();
+    if (e.code === "ShiftRight") {
       e.preventDefault();
       e.stopPropagation();
       if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
-      if (e.type === "keydown" && !e.repeat) toggleMenuSpace();
+      if (e.type === "keydown" && !e.repeat) toggleMenuPlayPause();
       return;
     }
 
@@ -319,7 +316,7 @@
         <button id="lfp-mute-btn" class="lfp-ctrl-btn" style="padding:4px 9px;">🔊 Volume</button>
         <input id="lfp-vol-slider" type="range" min="0" max="100" step="1" />
         <span id="lfp-vol-pct">80%</span>
-        <span style="margin-left:auto; font-size:11px; color:#8e8e8e;">Space: Play/Pause • ↑ / ↓</span>
+        <span style="margin-left:auto; font-size:11px; color:#8e8e8e;">Right Shift: Play/Pause • ↑ / ↓</span>
       </div>
       <div id="lfp-tracks"></div>
     </div>
