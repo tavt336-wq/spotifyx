@@ -4,7 +4,7 @@
   }
 
   const AUDIO_EXT = [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".webm"];
-  const STORAGE_KEY = "lfp_playlists_v10";
+  const STORAGE_KEY = "lfp_playlists_v11";
   const VOL_STORAGE_KEY = "lfp_volume_v1";
   const DB_NAME = "SpicetifyLocalFolderDB";
   const STORE_NAME = "dirHandles";
@@ -19,21 +19,25 @@
   audio.volume = Number.isFinite(savedVol) ? Math.min(1, Math.max(0, savedVol)) : 0.8;
   audio.addEventListener("ended", () => playNext());
 
-  function setLocalVolume(val) {
+  function setLocalVolume(val, showToast = false) {
     const clamped = Math.min(1, Math.max(0, Number(val)));
     audio.volume = clamped;
     try {
       localStorage.setItem(VOL_STORAGE_KEY, String(clamped));
     } catch (_) {}
     updateVolumeUI();
+    if (showToast) {
+      const pct = Math.round(clamped * 100);
+      Spicetify.showNotification(`🔊 Volume: ${pct}%`);
+    }
   }
 
   function toggleMuteLocal() {
     if (audio.volume > 0) {
       audio._prevVol = audio.volume;
-      setLocalVolume(0);
+      setLocalVolume(0, true);
     } else {
-      setLocalVolume(audio._prevVol && audio._prevVol > 0 ? audio._prevVol : 0.8);
+      setLocalVolume(audio._prevVol && audio._prevVol > 0 ? audio._prevVol : 0.8, true);
     }
   }
 
@@ -80,9 +84,6 @@
   document.addEventListener(
     "keydown",
     (e) => {
-      if (e.code !== "Space" && e.key !== " ") return;
-      if (e.repeat) return;
-
       const active = document.activeElement;
       const isTyping =
         active &&
@@ -92,15 +93,28 @@
 
       if (isTyping) return;
 
-      const hasLocalTrack =
+      const hasLocalContext =
         Boolean(audio.src) ||
+        Boolean(modalOpenForId) ||
         Boolean(getPlaylist(playingState.playlistId || activePlaylistId)?.tracks?.length);
-      if (!hasLocalTrack) return;
 
-      if (audio.src || modalOpenForId) {
+      if (!hasLocalContext) return;
+
+      if (e.code === "Space" || e.key === " ") {
+        if (e.repeat) return;
+        if (audio.src || modalOpenForId) {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleLocalPlayPause();
+        }
+        return;
+      }
+
+      if (modalOpenForId && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();
         e.stopPropagation();
-        toggleLocalPlayPause();
+        const step = e.key === "ArrowUp" ? 0.05 : -0.05;
+        setLocalVolume(audio.volume + step, true);
       }
     },
     true
@@ -358,7 +372,7 @@
     }
     #lfp-vol-slider {
       flex: 1;
-      max-width: 180px;
+      max-width: 220px;
       accent-color: #1db954;
       cursor: pointer;
     }
@@ -458,6 +472,7 @@
         <button id="lfp-mute-btn" class="lfp-ctrl-btn" style="padding:4px 9px;">🔊 Volume</button>
         <input id="lfp-vol-slider" type="range" min="0" max="100" step="1" />
         <span id="lfp-vol-pct">80%</span>
+        <span style="margin-left:auto; font-size:11px; color:#8e8e8e;">↑ / ↓</span>
       </div>
       <div id="lfp-tracks"></div>
     </div>
@@ -771,7 +786,7 @@
     if (modalOpenForId) deletePlaylist(modalOpenForId);
   };
   modalBackdrop.querySelector("#lfp-vol-slider").addEventListener("input", (e) => {
-    setLocalVolume(Number(e.target.value) / 100);
+    setLocalVolume(Number(e.target.value) / 100, false);
   });
   modalBackdrop.querySelector("#lfp-mute-btn").onclick = toggleMuteLocal;
 
