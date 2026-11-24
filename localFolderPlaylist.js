@@ -4,7 +4,8 @@
   }
 
   const AUDIO_EXT = [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".webm"];
-  const STORAGE_KEY = "lfp_playlists_v9";
+  const STORAGE_KEY = "lfp_playlists_v10";
+  const VOL_STORAGE_KEY = "lfp_volume_v1";
   const DB_NAME = "SpicetifyLocalFolderDB";
   const STORE_NAME = "dirHandles";
 
@@ -14,7 +15,27 @@
   let modalOpenForId = null;
 
   const audio = new Audio();
+  const savedVol = parseFloat(localStorage.getItem(VOL_STORAGE_KEY));
+  audio.volume = Number.isFinite(savedVol) ? Math.min(1, Math.max(0, savedVol)) : 0.8;
   audio.addEventListener("ended", () => playNext());
+
+  function setLocalVolume(val) {
+    const clamped = Math.min(1, Math.max(0, Number(val)));
+    audio.volume = clamped;
+    try {
+      localStorage.setItem(VOL_STORAGE_KEY, String(clamped));
+    } catch (_) {}
+    updateVolumeUI();
+  }
+
+  function toggleMuteLocal() {
+    if (audio.volume > 0) {
+      audio._prevVol = audio.volume;
+      setLocalVolume(0);
+    } else {
+      setLocalVolume(audio._prevVol && audio._prevVol > 0 ? audio._prevVol : 0.8);
+    }
+  }
 
   function playCurrentOrSelected() {
     const targetId = modalOpenForId || playingState.playlistId || activePlaylistId;
@@ -266,44 +287,54 @@
     }
     #lfp-modal-backdrop.open, #lfp-prompt-backdrop.open { display: flex; }
     #lfp-modal {
-      width: 560px;
-      max-width: 90vw;
-      max-height: 76vh;
-      background: #1e1e1e;
+      width: 600px;
+      max-width: 92vw;
+      max-height: 80vh;
+      background: linear-gradient(180deg, #2a2a2a 0%, #121212 38%);
       color: #fff;
       border: 1px solid #383838;
       border-radius: 12px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75);
     }
     #lfp-modal-header {
-      padding: 14px 18px;
-      background: #262626;
-      border-bottom: 1px solid #363636;
+      padding: 18px 20px 14px 20px;
+      background: rgba(255, 255, 255, 0.04);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      gap: 10px;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .lfp-badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #1db954;
+      margin-bottom: 4px;
     }
     #lfp-controls {
       display: flex;
       flex-wrap: wrap;
+      align-items: center;
       gap: 8px;
-      padding: 10px 18px;
-      border-bottom: 1px solid #2e2e2e;
-      background: #181818;
+      padding: 10px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(0, 0, 0, 0.35);
     }
     .lfp-ctrl-btn {
-      background: #2b2b2b;
+      background: #282828;
       color: #fff;
-      border: 1px solid #444;
+      border: 1px solid #404040;
       border-radius: 999px;
       padding: 5px 11px;
       font-size: 12px;
       cursor: pointer;
     }
-    .lfp-ctrl-btn:hover { background: #383838; }
+    .lfp-ctrl-btn:hover { background: #333; }
     .lfp-ctrl-btn.on {
       background: rgba(29, 185, 84, 0.18);
       border-color: #1db954;
@@ -315,22 +346,56 @@
       color: #ff7b7b;
       margin-left: auto;
     }
-    #lfp-tracks { flex: 1; overflow-y: auto; padding: 10px 14px; }
+    #lfp-volume-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 20px;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 12px;
+      color: #d4d4d4;
+    }
+    #lfp-vol-slider {
+      flex: 1;
+      max-width: 180px;
+      accent-color: #1db954;
+      cursor: pointer;
+    }
+    #lfp-vol-pct {
+      min-width: 38px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      color: #b3b3b3;
+    }
+    #lfp-tracks {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 12px 14px 12px;
+    }
     .lfp-track {
       padding: 8px 12px;
       border-radius: 6px;
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 32px 1fr auto;
       align-items: center;
+      gap: 8px;
       cursor: pointer;
       font-size: 13px;
+      color: #e5e5e5;
     }
-    .lfp-track:hover { background: #2a2a2a; }
+    .lfp-track:hover { background: rgba(255, 255, 255, 0.08); }
     .lfp-track.playing {
       color: #1db954;
-      background: rgba(29, 185, 84, 0.12);
+      background: rgba(29, 185, 84, 0.14);
       font-weight: 700;
     }
+    .lfp-track-idx {
+      color: #9a9a9a;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    .lfp-track.playing .lfp-track-idx { color: #1db954; }
     #lfp-prompt {
       width: 340px;
       max-width: 90vw;
@@ -374,8 +439,9 @@
     <div id="lfp-modal">
       <div id="lfp-modal-header">
         <div>
-          <h2 id="lfp-modal-title" style="margin:0; font-size:17px;">Playlist</h2>
-          <p id="lfp-modal-sub" style="margin:2px 0 0 0; font-size:12px; color:#b3b3b3;">0 tracks</p>
+          <div class="lfp-badge">Local Folder Playlist</div>
+          <h2 id="lfp-modal-title" style="margin:0; font-size:20px; font-weight:700;">Playlist</h2>
+          <p id="lfp-modal-sub" style="margin:4px 0 0 0; font-size:12px; color:#b3b3b3;">0 tracks</p>
         </div>
         <button id="lfp-modal-close" class="lfp-ctrl-btn">✕ Close</button>
       </div>
@@ -388,10 +454,27 @@
         <button id="lfp-refresh-btn" class="lfp-ctrl-btn">🔄 Refresh Folder</button>
         <button id="lfp-delete-btn" class="lfp-ctrl-btn danger">🗑 Delete Playlist</button>
       </div>
+      <div id="lfp-volume-row">
+        <button id="lfp-mute-btn" class="lfp-ctrl-btn" style="padding:4px 9px;">🔊 Volume</button>
+        <input id="lfp-vol-slider" type="range" min="0" max="100" step="1" />
+        <span id="lfp-vol-pct">80%</span>
+      </div>
       <div id="lfp-tracks"></div>
     </div>
   `;
   document.body.appendChild(modalBackdrop);
+
+  function updateVolumeUI() {
+    const pct = Math.round(audio.volume * 100);
+    const slider = modalBackdrop.querySelector("#lfp-vol-slider");
+    const pctLabel = modalBackdrop.querySelector("#lfp-vol-pct");
+    const muteBtn = modalBackdrop.querySelector("#lfp-mute-btn");
+    if (slider) slider.value = String(pct);
+    if (pctLabel) pctLabel.textContent = `${pct}%`;
+    if (muteBtn) muteBtn.textContent = pct === 0 ? "🔇 Muted" : pct < 45 ? "🔉 Volume" : "🔊 Volume";
+  }
+
+  updateVolumeUI();
 
   function askPlaylistName(count, suggested) {
     return new Promise((resolve) => {
@@ -482,7 +565,7 @@
     const diffText = diff > 0 ? ` (+${diff} new)` : diff < 0 ? ` (${diff})` : "";
 
     if (modalOpenForId === playlistId) {
-      modalBackdrop.querySelector("#lfp-modal-sub").textContent = `${freshTracks.length} tracks (saved)`;
+      modalBackdrop.querySelector("#lfp-modal-sub").textContent = `${freshTracks.length} tracks • Local Folder`;
       renderModalTracks(pl);
     }
     renderChips();
@@ -554,7 +637,7 @@
 
     const list = pl.tracks.length ? pl.tracks : (pl.trackNames || []).map((t) => ({ title: t, url: null }));
     if (!list.length) {
-      container.innerHTML = `<p style="color:#b3b3b3; font-size:13px;">Grant folder permission or click Refresh Folder to load tracks.</p>`;
+      container.innerHTML = `<p style="color:#b3b3b3; font-size:13px; padding:8px 12px;">Grant folder permission or click Refresh Folder to load tracks.</p>`;
       return;
     }
 
@@ -562,7 +645,11 @@
       const isCurrent = playingState.playlistId === pl.id && playingState.trackIndex === i;
       const row = document.createElement("div");
       row.className = `lfp-track ${isCurrent ? "playing" : ""}`;
-      row.innerHTML = `<span>${i + 1}. ${track.title}</span><span>${isCurrent ? "▶ Playing" : ""}</span>`;
+      row.innerHTML = `
+        <span class="lfp-track-idx">${i + 1}</span>
+        <span>${track.title}</span>
+        <span>${isCurrent ? "▶ Playing" : ""}</span>
+      `;
       row.onclick = async () => {
         if (!pl.tracks.length && !(await ensureTracksLoaded(pl))) {
           Spicetify.showNotification("Cannot access tracks. Click Refresh Folder.", true);
@@ -584,12 +671,13 @@
 
     const count = pl.tracks.length || (pl.trackNames || []).length;
     modalBackdrop.querySelector("#lfp-modal-title").textContent = pl.name;
-    modalBackdrop.querySelector("#lfp-modal-sub").textContent = `${count} tracks (saved)`;
+    modalBackdrop.querySelector("#lfp-modal-sub").textContent = `${count} tracks • Local Folder`;
 
     const shuffleBtn = modalBackdrop.querySelector("#lfp-shuffle-btn");
     shuffleBtn.textContent = `🔀 Shuffle: ${playingState.shuffle ? "ON" : "OFF"}`;
     shuffleBtn.classList.toggle("on", playingState.shuffle);
 
+    updateVolumeUI();
     renderModalTracks(pl);
     modalBackdrop.classList.add("open");
     renderChips();
@@ -682,6 +770,10 @@
   modalBackdrop.querySelector("#lfp-delete-btn").onclick = () => {
     if (modalOpenForId) deletePlaylist(modalOpenForId);
   };
+  modalBackdrop.querySelector("#lfp-vol-slider").addEventListener("input", (e) => {
+    setLocalVolume(Number(e.target.value) / 100);
+  });
+  modalBackdrop.querySelector("#lfp-mute-btn").onclick = toggleMuteLocal;
 
   function findMarketplaceElement() {
     const candidates = Array.from(document.querySelectorAll("a, button, [role='link'], [role='button']"));
