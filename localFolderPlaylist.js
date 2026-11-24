@@ -4,7 +4,7 @@
   }
 
   const AUDIO_EXT = [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".webm"];
-  const STORAGE_KEY = "lfp_playlists_v13";
+  const STORAGE_KEY = "lfp_playlists_v14";
   const VOL_STORAGE_KEY = "lfp_volume_v1";
   const DB_NAME = "SpicetifyLocalFolderDB";
   const STORE_NAME = "dirHandles";
@@ -20,6 +20,16 @@
   const savedVol = parseFloat(localStorage.getItem(VOL_STORAGE_KEY));
   audio.volume = Number.isFinite(savedVol) ? Math.min(1, Math.max(0, savedVol)) : 0.8;
   audio.addEventListener("ended", () => playNext());
+
+  function pauseSpotifyPlayer() {
+    try {
+      if (Spicetify?.Player?.data?.isPaused === false && typeof Spicetify.Player.pause === "function") {
+        Spicetify.Player.pause();
+      } else if (typeof Spicetify.Player.pause === "function") {
+        Spicetify.Player.pause();
+      }
+    } catch (_) {}
+  }
 
   function playVolumeFeedback(vol) {
     const now = performance.now();
@@ -89,7 +99,7 @@
     const pl = getPlaylist(targetId);
     if (!pl || !pl.tracks?.length) return;
 
-    try { Spicetify.Player.pause(); } catch (_) {}
+    pauseSpotifyPlayer();
 
     if (audio.src && playingState.playlistId === targetId && playingState.trackIndex >= 0 && audio.paused) {
       audio.play().catch(() => {});
@@ -113,6 +123,8 @@
 
   function toggleLocalPlayPauseInMenu() {
     if (!modalOpenForId) return;
+    pauseSpotifyPlayer();
+
     if (!audio.src) {
       playCurrentOrSelected();
       return;
@@ -124,47 +136,49 @@
     }
   }
 
-  window.addEventListener(
-    "keydown",
-    (e) => {
-      if (!modalOpenForId) return;
+  function handleMenuKeyDown(e) {
+    if (!modalOpenForId) return;
 
-      const active = document.activeElement;
-      const isTyping =
-        active &&
-        (active.tagName === "INPUT" ||
-          active.tagName === "TEXTAREA" ||
-          active.isContentEditable);
+    const active = document.activeElement;
+    const isTyping =
+      active &&
+      (active.tagName === "INPUT" ||
+        active.tagName === "TEXTAREA" ||
+        active.isContentEditable);
 
-      if (isTyping) return;
+    if (isTyping) return;
 
-      const isSpace = e.code === "Space" || e.key === " " || e.key === "Spacebar";
-      if (isSpace) {
-        if (e.repeat) return;
-        if (active && typeof active.blur === "function" && active !== document.body) {
-          active.blur();
-        }
-        e.preventDefault();
-        e.stopPropagation();
-        if (typeof e.stopImmediatePropagation === "function") {
-          e.stopImmediatePropagation();
-        }
-        toggleLocalPlayPauseInMenu();
-        return;
+    const isSpace = e.code === "Space" || e.key === " " || e.key === "Spacebar" || e.keyCode === 32;
+    if (isSpace) {
+      if (active && typeof active.blur === "function" && active !== document.body) {
+        active.blur();
       }
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === "function") {
+        e.stopImmediatePropagation();
+      }
+      if (!e.repeat) {
+        toggleLocalPlayPauseInMenu();
+      }
+      return;
+    }
 
-      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-        e.preventDefault();
-        e.stopPropagation();
-        if (typeof e.stopImmediatePropagation === "function") {
-          e.stopImmediatePropagation();
-        }
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof e.stopImmediatePropagation === "function") {
+        e.stopImmediatePropagation();
+      }
+      if (!e.repeat) {
         const step = e.key === "ArrowUp" ? 0.05 : -0.05;
         setLocalVolume(audio.volume + step, true, true);
       }
-    },
-    true
-  );
+    }
+  }
+
+  window.addEventListener("keydown", handleMenuKeyDown, true);
+  document.addEventListener("keydown", handleMenuKeyDown, true);
 
   function openDB() {
     return new Promise((resolve, reject) => {
@@ -495,6 +509,7 @@
 
   const modalBackdrop = document.createElement("div");
   modalBackdrop.id = "lfp-modal-backdrop";
+  modalBackdrop.setAttribute("tabindex", "-1");
   modalBackdrop.innerHTML = `
     <div id="lfp-modal">
       <div id="lfp-modal-header">
@@ -524,6 +539,7 @@
     </div>
   `;
   document.body.appendChild(modalBackdrop);
+  modalBackdrop.addEventListener("keydown", handleMenuKeyDown, true);
 
   function updateVolumeUI() {
     const pct = Math.round(audio.volume * 100);
@@ -641,7 +657,7 @@
     playingState.playlistId = playlistId;
     playingState.trackIndex = safeIdx;
 
-    try { Spicetify.Player.pause(); } catch (_) {}
+    pauseSpotifyPlayer();
 
     const track = pl.tracks[safeIdx];
     audio.src = track.url;
@@ -741,6 +757,7 @@
     updateVolumeUI();
     renderModalTracks(pl);
     modalBackdrop.classList.add("open");
+    modalBackdrop.focus({ preventScroll: true });
     renderChips();
   }
 
